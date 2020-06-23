@@ -1,0 +1,113 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>DevOps自动化运维平台</title>
+    <meta name="description" content="">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="robots" content="all,follow">
+    <!-- Bootstrap CSS-->
+    <link rel="stylesheet" href="{% static 'login/css/bootstrap-4.2.1.css' %}">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Poppins:300,400,700">
+    <link rel="stylesheet" href="{% static 'login/css/style.default.css' %}" id="theme-stylesheet">
+</head>
+<body>
+<div class="page login-page">
+    <div class="container d-flex align-items-center">
+        <div class="form-holder has-shadow">
+            <div class="row">
+                <!-- Logo & Information Panel-->
+                <div class="col-lg-6">
+                    <div class="info d-flex align-items-center">
+
+                        <div class="content">
+                            <div class="logo">
+                                <h1>欢迎注册</h1>
+                            </div>
+                            <p>某某DevOps自动化运维平台</p>
+                        </div>
+
+                    </div>
+                </div>
+                <!-- Form Panel    -->
+                <div class="col-lg-6 bg-white">
+                    <div class="form d-flex align-items-center">
+                        {% csrf_token %}
+                        <div class="content">
+                         <div id="div1" class="form-group">
+                            {% for field in form %}
+                                <div >
+{#                                <div id="div1" class="form-group">#}
+                                {% if  field.label == '性别'%}
+                                    <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                                    {{ field }}
+                                    <span class="help-block" style="color: red"></span>
+                                {% else %}
+                                    <label for="{{ field.id_for_label }}"> </label>
+                                    {{ field }}
+                                    <span class="help-block" style="color: red"></span>
+                                {% endif %}
+                                </div>
+
+
+
+                            {% endfor %}
+                          </div>
+                            <div class="form-group">
+                                <button id="regbtn" type="button" name="registerSubmit" class="btn btn-primary">注册
+                                </button>
+                            </div>
+                            <div class="form-group">
+                                <small>已有账号?</small><a href="{% url 'login' %}" class="signup">&nbsp;登录</a>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    </form>
+</div>
+<!-- JavaScript files-->
+<script src="https://www.jq22.com/jquery/jquery-1.10.2.js"></script>
+<script src="https://www.jq22.com/jquery/bootstrap-4.2.1.js"></script>
+
+<script>
+    $('#regbtn').click(function () {
+    // 清除之前的报错提示
+    var dataObj = {};
+    $('input').each(function () {
+        dataObj[$(this).attr('name')] = $(this).val();
+        {#dataObj[$(this).attr('name')] = $(this).val();#}
+    });
+    console.log(dataObj);
+    // 取 input 标签的值
+    $.ajax({
+        url: '/register/',
+        type: 'post',
+        data: dataObj,
+        success: function (res) {
+            if (res.code === 0) {
+                location.href = res.url;
+            } else {
+                $.each(res.error_msg, function (k, v) {
+                    // 根据k 找到对应的 input框,把v中第一个字符串显示出来
+                    $('#id_' + k).next('span').text(v[0]).parent().addClass('has-error');
+
+                })
+            }
+        }
+    })
+    });
+    // input 标签获取交单后清除之前的错误提示
+    $('input').focus(function () {
+        $(this).next('span').text('').parent().removeClass('has-error');
+    })
+
+</script>
+
+</body>
+</html>
