@@ -8,7 +8,10 @@ from django.http import JsonResponse
 from sales.forms import RegForm,CustomerForm
 from django.contrib import auth
 from django.urls import reverse
+
+# 导入分页类
 from utils.mypage import Pagination
+
 class login(views.View):
     def get(self,request):
         rep = render(request, 'login.html')
@@ -76,17 +79,21 @@ def homeVie(request):
 
 # 查看用户表
 def customer_list(request):
+    index_page = request.GET.get('page', 1)
     url_prefix = request.path_info
-    print(request.get_full_path())
-    print(url_prefix)
-    print('*' * 120)
+
     # 获取所有客户信息进行展示
     query_set = Customer.objects.all()
+    all_data = query_set.count()
+    print(all_data)
+    page_obj = Pagination(index_page,all_data,url_prefix='/crm/customer_list/')
     # current_page = request.GET.get('page',1)
     # page_obj = Pagination(current_page,query_set.count(),url_prefix,per_page=2)
-    # data = query_set[page_obj.start:page_obj.end]
+    # data = query_set[page_obj.start:page_obj.end] 'page_html':html_page
+    data = query_set[page_obj.start:page_obj.end]
+    page_html = page_obj.page_html
     # 在页面上展示出来
-    return render(request,'customer_list.html',{'customer_list':query_set})
+    return render(request,'customer_list.html',{'customer_list':data,'page_html':page_html})
 
 
 

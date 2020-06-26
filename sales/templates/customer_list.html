@@ -1,5 +1,4 @@
 {% extends 'base.html' %}
-
 {% block page-main %}
 <h2 class="sub-header">客户列表</h2>
 {#    添加用户按钮 #}
@@ -35,9 +34,9 @@
             <td>{{ customer.phone|default:'暂无' }}</td>
             <td>{{ customer.get_source_display }}</td>
             <td>{{ customer.course }}</td>
-            <td>{{ customer.consultant }}</td>
+            <td>{{ customer.consultant|default:'暂无' }}</td>
             <td>{{ customer.get_class_type_display }}</td>
-            <td>{{ customer.show_status }}</td>
+            <td>{{ customer.show_status|default:'暂无'}}</td>
             <td>{{ customer.date|date:'Y-m-d' }}</td>
             <td>{{ customer.show_class_list|default:'暂无' }}</td>
             <td><a href="{% url 'edit_customer' customer.id %}"><i class="fa fa-edit" aria-hidden="true"></i></a></td>

@@ -82,8 +82,8 @@ class Customer(models.Model):
     next_date = models.DateField("预计再次跟进时间", blank=True, null=True)
     network_consultant = models.ForeignKey('UserProfile', blank=True, null=True, verbose_name='咨询师',
                                            related_name='network_consultant')
-    consultant = models.ForeignKey('UserProfile', verbose_name="销售", related_name='customers', blank=True, null=True, )
-    class_list = models.ManyToManyField('ClassList', verbose_name="已报班级",blank=True, null=True)
+    consultant = models.ForeignKey('UserProfile', verbose_name="销售", related_name='customers',blank=True, null=True,  )
+    class_list = models.ManyToManyField('ClassList', verbose_name="已报班级",blank=True, null=True,)
     class Meta:
         verbose_name = '客户'
         verbose_name_plural = verbose_name
