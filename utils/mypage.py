@@ -2,11 +2,11 @@
 自定义分页组件
 可以返回分页的数据和分页的HTML代码
 """
-
+from django.http import QueryDict
 
 class Pagination(object):
     
-    def __init__(self, current_page, total_count, url_prefix, per_page=10, show_page=9):
+    def __init__(self, current_page, total_count, url_prefix, query_dict=QueryDict(mutable=True),per_page=10, show_page=9):
         """
         初始化分分页器
         :param url_prefix: a标签的URL前缀
@@ -17,7 +17,9 @@ class Pagination(object):
         """
         # 0.分页的URL前缀
         self.url_prefix = url_prefix
+        self.query_dict = query_dict
         # 1. 每一页显示10条数据
+        assert per_page > 0
         self.per_page = per_page
         # 2. 计算需要多少页
         total_page, more = divmod(total_count, per_page)
@@ -29,10 +31,11 @@ class Pagination(object):
             current_page = int(current_page)
         except Exception as e:
             current_page = 1
+        current_page = total_page if current_page > total_page else current_page
         # 页码必须是大于0的数
         if current_page < 1:
             current_page = 1
-        current_page = total_page if current_page > total_page else current_page
+
         self.current_page = current_page
         # 4. 页面最多显示的页码数
         self.show_page = show_page
@@ -51,6 +54,8 @@ class Pagination(object):
         
     # 定义一个返回HTML代码的方法
     def page_html(self):
+        if self.total_page == 0:
+            return ''
         # 如果总页码数小于最大要显示的页码数
         if self.total_page < self.show_page:
             show_page_start = 1
@@ -72,21 +77,22 @@ class Pagination(object):
         # 添加分页代码的前缀
         page_list.append('<nav aria-label="Page navigation"><ul class="pagination">')
         # 添加首页
-        page_list.append('<li><a href="{}?page=1">首页</a></li>'.format(self.url_prefix))
+        self.query_dict['page'] = 1
+        page_list.append(f'<li><a href="{self.url_prefix}?{self.query_dict.urlencode()}">首页</a></li>')
         # 添加上一页
         if self.current_page - 1 < 1:  # 已经到头啦，不让点上一页啦
             page_list.append(
                 '<li class="disabled"><a href="" aria-label="Previous"><span aria-hidden="true">&laquo;</span></a></li>')
         else:
+            self.query_dict['page'] = self.current_page - 1
             page_list.append(
-                '<li><a href="{}?page={}" aria-label="Previous"><span aria-hidden="true">&laquo;</span></a></li>'.format(
-                    self.url_prefix,
-                    self.current_page - 1))
+                f'<li><a href="{self.url_prefix}?{self.query_dict.urlencode()}" aria-label="Previous"><span aria-hidden="true">&laquo;</span></a></li>')
         for i in range(show_page_start, show_page_end + 1):
+            self.query_dict['page'] = i
             if i == self.current_page:
-                s = '<li class="active"><a href="{1}?page={0}">{0}</a></li>'.format(i, self.url_prefix)
+                s = f'<li class="active"><a href="{self.url_prefix}?{self.query_dict.urlencode()}">{i}</a></li>'
             else:
-                s = '<li><a href="{1}?page={0}">{0}</a></li>'.format(i, self.url_prefix)
+                s = f'<li><a href="{self.url_prefix}?{self.query_dict.urlencode()}">{i}</a></li>'
             page_list.append(s)
         # 添加下一页
         if self.current_page + 1 > self.total_page:
@@ -94,12 +100,10 @@ class Pagination(object):
                 '<li class="disabled"><a href="" aria-label="Next"><span aria-hidden="true">&raquo;</span></a></li>')
         else:
             page_list.append(
-                '<li><a href="{}?page={}" aria-label="Next"><span aria-hidden="true">&raquo;</span></a></li>'.format(
-                    self.url_prefix,
-                    self.current_page + 1)
+                f'<li><a href="{self.url_prefix}?{self.query_dict.urlencode()}" aria-label="Next"><span aria-hidden="true">&raquo;</span></a></li>'
             )
         # 添加尾页
-        page_list.append('<li><a href="{}?page={}">尾页</a></li>'.format(self.url_prefix, self.total_page))
+        page_list.append(f'<li><a href="{self.url_prefix}?{self.query_dict.urlencode()}">尾页</a></li>')
         # 添加分页代码的后缀
         page_list.append('</ul></nav>')
         page_html = ''.join(page_list)

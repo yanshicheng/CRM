@@ -1,15 +1,19 @@
 from django.shortcuts import render,HttpResponse,redirect
 from django import views
 from sales.models import UserProfile,Customer
-from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt,csrf_protect
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from sales.forms import RegForm,CustomerForm
 from django.contrib import auth
 from django.urls import reverse
+from copy import deepcopy
+from django.utils.decorators import method_decorator
+from django.db.models import Q
+from django.http import QueryDict
 
-# 导入分页类
+
+# 导入分页类发
 from utils.mypage import Pagination
 
 class login(views.View):
@@ -78,28 +82,74 @@ def homeVie(request):
 
 
 # 查看用户表
-def customer_list(request):
-    index_page = request.GET.get('page', 1)
-    url_prefix = request.path_info
+class CustomerListVuew(views.View):
+    @method_decorator(login_required)
+    def get(self,request):
+        url_prefix = request.path_info
 
-    # 获取所有客户信息进行展示
-    query_set = Customer.objects.all()
-    all_data = query_set.count()
-    print(all_data)
-    page_obj = Pagination(index_page,all_data,url_prefix='/crm/customer_list/')
-    # current_page = request.GET.get('page',1)
-    # page_obj = Pagination(current_page,query_set.count(),url_prefix,per_page=2)
-    # data = query_set[page_obj.start:page_obj.end] 'page_html':html_page
-    data = query_set[page_obj.start:page_obj.end]
-    page_html = page_obj.page_html
-    # 在页面上展示出来
-    return render(request,'customer_list.html',{'customer_list':data,'page_html':page_html})
+        # 模糊搜索的参数传入 Pagination 分页方法中
+        qd = deepcopy(request.GET)  # <QueryDict: {'query': ['了']}>
+        qd._mutable = True  # 让QueryDict对象可修改
 
+        current_page = request.GET.get('page', 1)
+        if request.path_info == reverse('my_customer'):
+            # 获取所有客户信息进行展示
+            query_set = Customer.objects.filter(consultant=request.user) # 获取当前 登录的人
+        else:
+            # 获取所有公户信息
+            query_set = Customer.objects.filter(consultant__isnull=True)    # 基于双下划綫找到 cinsultant 字段为空的数据
+        # 根据模糊检索的条件对 query_set 做过滤
+        # 找到 name,qq,qq_name,字段包含 query_value的那些数据,这些数据就是模糊搜索的结果
+        q = self._fuzzy_search(['name','qq','qq_name'])
+        query_set = query_set.filter(q)
 
+        # 取到所有数据的总和
+        all_data = query_set.count()
+        print(all_data)
+        page_obj = Pagination(current_page,all_data,url_prefix,qd,per_page=5)
 
+        # 切片取到展示的数据
+        data = query_set[page_obj.start:page_obj.end]
+        # 返回页码
+        page_html = page_obj.page_html
+        # 在页面上展示出来
+        return render(request,'customer_list.html',{'customer_list':data,'page_html':page_html})
+    @method_decorator(login_required)
+    def post(self,request):
+        # 批量操作 (变公户/变私户)
+        cid  = request.POST.getlist('cid')  # 获取要操作的客户的 id
+        action = request.POST.get('action') # 获取要执行的方法
+        # 判断 self 是否有一个 _action 的方法,如果有就执行,否则就返回 404
+        if not hasattr(self,f'_{action}'):
+            return HttpResponse('404')
+        getattr(self,f'_{action}')(cid)
+        return redirect(reverse('customer_list'))
 
-####### 版本一
+    # 定义批量变为私户的函数
+    def _to_private(self,cid):
+        # 方法1: 找到要操作的客户数据,把他们变为我的客户
+        # Customer.objects.filter(id__in=cid).update(consultant=register.user)
+        # 方法2: 把要操作的客户添加到我的客户列表中
+        self.request.user.customers.add(*Customer.objects.filter(id__in=cid))
 
+    # 定义批量变为公户的函数
+    def _to_public(self,cid):
+        # 方法1: 找到要操作的客户的数据,把他们的销售字段置为空
+        Customer.objects.filter(id__in=cid).update(consultant=None)
+        # 方法2: 从我的客户列表里面吧指定的客户删掉
+        # self.request.user.customers.remove(*Customer.objects.filter(id__in=cid))
+
+    # 定义一个模糊检索的方法
+    def _fuzzy_search(self,field_list,op='OR'):
+        # 从 URL 中取到 query 参数
+        query_value = self.request.GET.get('query','')
+        q = Q()
+        q.connector = op
+        for field in field_list:
+            q.children.append(Q((f'{field}__icontains', query_value)))
+        return q
+
+####### 版本一 ================
 def add_customer(request):
     form_obj = CustomerForm()
     if request.method == 'POST':
@@ -109,7 +159,6 @@ def add_customer(request):
             form_obj.save()
             return redirect(reverse('customer_list'))
     return render(request,'add_customer.html',{'form_obj':form_obj})
-
 def edit_customer(request,edit_id):
     customer_obj = Customer.objects.filter(pk=edit_id).first()
     form_obj = CustomerForm(instance=customer_obj)
@@ -125,6 +174,23 @@ def edit_customer(request,edit_id):
 
     return render(request, 'edit_customer.html', {'form_obj': form_obj})
 
+############## 编辑客户 版本 二 ===============
+def customer(request,edit_id=None):
+    # 如果edit_id=None表示是新增操作
+    # 如果edit_id有值表示是编辑操作
+    # ret = Customer.objects.filter(pk=10000000).first()
+    # print(ret)
+    customer_obj = Customer.objects.filter(pk=edit_id).first()
+    form_obj = CustomerForm(instance=customer_obj)
+    if request.method == "POST":
+        # 使用 POST 提交的数据去更新指定的 instance 实例
+        form_obj = CustomerForm(request.POST,instance=customer_obj)
+        if form_obj.is_valid():
+            form_obj.save()
+            # 如果能从 URL 获取到 next 参数就跳转到指定的 URL, 没有就默认跳转到客户列表页面.
+            next_url = request.GET.get('next',reverse('customer_list'))
+            return redirect(next_url)
+    return render(request,'customer.html',{'form_obj': form_obj, 'edit_id': edit_id})
 
 # 注销函数
 def logout(request):
