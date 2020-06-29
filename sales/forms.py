@@ -1,11 +1,18 @@
 from django import forms
-from sales.models import UserProfile,Customer
+from sales.models import UserProfile, Customer, ConsultRecord, Enrollment, ClassList
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 
+# ModelForm
+class BootstrapBaseForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 给实例对象的每一个字段添加class
+        for field in self.fields.values():
+            field.widget.attrs.update({'class': 'form-control form-group input-material'})
 
 # ModeForm
-class RegForm(forms.ModelForm):
+class RegForm(BootstrapBaseForm):
     # 重写字段
     # name = forms.CharField(
     #     max_length=16,
@@ -97,11 +104,11 @@ class RegForm(forms.ModelForm):
 
         }
 
-    # 初始化
-    def __init__(self,*args,**kwargs):
-        super().__init__(*args,**kwargs)
-        for field in self.fields.values():
-            field.widget.attrs.update({'class': 'form-group input-material'})
+    # # 初始化
+    # def __init__(self,*args,**kwargs):
+    #     super().__init__(*args,**kwargs)
+    #     for field in self.fields.values():
+    #         field.widget.attrs.update({'class': 'form-group input-material'})
 
 
 
@@ -133,11 +140,11 @@ class RegForm(forms.ModelForm):
             raise ValidationError('两次密码不一致')
 
 # 编辑 FoRM
-class CustomerForm(forms.ModelForm):
-    def __init__(self,*args,**kwargs):
-        super(CustomerForm,self).__init__(*args,**kwargs)
-        for field in self.fields.values():
-            field.widget.attrs.update({'class': 'form-control'})
+class CustomerForm(BootstrapBaseForm):
+    # def __init__(self,*args,**kwargs):
+    #     super(CustomerForm,self).__init__(*args,**kwargs)
+    #     for field in self.fields.values():
+    #         field.widget.attrs.update({'class': 'form-control'})
 
     class Meta:
         model = Customer
@@ -146,3 +153,45 @@ class CustomerForm(forms.ModelForm):
             'course': forms.widgets.SelectMultiple,
             'birthday': forms.widgets.DateInput(attrs={'type': 'date'}),
         }
+
+# 沟通记录的form
+class ConsultRecordForm(BootstrapBaseForm):
+    class Meta:
+        model = ConsultRecord
+        exclude = ['delete_status', ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 把customer字段的choice设置成我的客户
+        print(self.instance, id(self.instance))
+        print('&' * 120)
+        # 方法1：修改字段的chocies选项
+        # self.fields['customer'].choices = Customer.objects.filter(consultant=self.instance.consultant).values_list('id','name')
+        # 方法2：将form表的字段直接修改字段
+        self.fields['customer'] = forms.models.ModelChoiceField(queryset=Customer.objects.filter(consultant=self.instance.consultant))
+        self.fields['customer'].widget.attrs.update({'class': 'form-control'})
+        # 修改跟进人只能是自己
+        self.fields['consultant'].choices = [(self.instance.consultant.id, self.instance.consultant.name), ]
+
+
+# 报名表
+class EnrollmentForm(BootstrapBaseForm):
+
+    class Meta:
+        model = Enrollment
+        exclude = ['contract_approved', 'delete_status']
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # 限制添加报名表的时候只能选自己私户
+        # print(self.instance)
+        self.fields['customer'].choices = [(self.instance.customer.id, self.instance.customer.name)]
+
+
+
+# 班级表
+class ClassListForm(BootstrapBaseForm):
+
+    class Meta:
+        model = ClassList
+        fields = '__all__'

@@ -1,10 +1,10 @@
 from django.shortcuts import render,HttpResponse,redirect
 from django import views
-from sales.models import UserProfile,Customer
+from sales.models import UserProfile,Customer,ConsultRecord,Enrollment
 from django.views.decorators.csrf import csrf_exempt,csrf_protect
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
-from sales.forms import RegForm,CustomerForm
+from sales.forms import RegForm,CustomerForm,ConsultRecordForm,EnrollmentForm
 from django.contrib import auth
 from django.urls import reverse
 from copy import deepcopy
@@ -29,7 +29,7 @@ class login(views.View):
         user_obj = auth.authenticate(request,email=email,password=pwd)
         if user_obj:
             # 获取用户上个页面跳转的 地址 如果没有获取到则设置 默认值
-            return_url = request.GET.get('return_Url','/home/')
+            return_url = request.GET.get('next','/crm/customer_list/')
             print(return_url)
             # 设置 session 字典属性
             auth.login(request, user_obj)
@@ -112,8 +112,19 @@ class CustomerListVuew(views.View):
         data = query_set[page_obj.start:page_obj.end]
         # 返回页码
         page_html = page_obj.page_html
+
+
+        # 2. 返回之前的页面
+        # 2.1 获取当前请求的带query参数的URL
+        url = request.get_full_path()
+        # 2.2 生成一个空的QUeryDict对象
+        query_params = QueryDict(mutable=True)
+        # 2.3 添加一个next键值对
+        query_params['next'] = url
+        # 2.4 利用QUeryDict内置的方法编码成URL
+        next_url = query_params.urlencode()
         # 在页面上展示出来
-        return render(request,'customer_list.html',{'customer_list':data,'page_html':page_html})
+        return render(request,'customer_list.html',{'customer_list':data,'next_url': next_url,'page_html':page_html})
     @method_decorator(login_required)
     def post(self,request):
         # 批量操作 (变公户/变私户)
@@ -196,3 +207,64 @@ def customer(request,edit_id=None):
 def logout(request):
     auth.logout(request)
     return redirect('/login/')
+
+
+
+########## 沟通记录相关 ########
+
+# 展示沟通记录
+def consult_record_list(request,cid=0):
+    if int(cid) == 0:
+        # 从数据库中查询销售是自己并且没有删除的那些沟通记录
+        query_set = ConsultRecord.objects.filter(consultant=request.user,delete_status=False)
+    else:
+        # 从数据库查询指定客户的没有删除的沟通记录
+        query_set = ConsultRecord.objects.filter(customer_id=cid,delete_status=False)
+    return render(request,'consult_record_list.html',{'consult_record': query_set})
+
+# 查看和编辑沟通记录
+def consult_record(request,edit_id=None):
+    record_obj = ConsultRecord.objects.filter(id=edit_id).first()
+    if not record_obj:
+        record_obj = ConsultRecord(consultant=request.user) # 生成一个销售是我的 consultrecord 对象
+
+    form_obj = ConsultRecordForm(instance=record_obj, initial={'consultant': request.user})
+    if request.method == "POST":
+        form_obj = ConsultRecordForm(request.POST, instance=record_obj)
+        if form_obj.is_valid():
+            form_obj.save()
+            return redirect(reverse('consult_record', kwargs={'cid': 0}))
+    return render(request, 'consult_record.html', {'form_obj': form_obj, 'edit_id': edit_id})
+
+######## 报名记录相关
+# --------------------- day76 --------------------
+class EnrollmentListView(views.View):
+    def get(self, request, customer_id=0):
+        if int(customer_id) == 0:
+            # 查询当前这个销售所有客户的报名表
+            query_set = Enrollment.objects.filter(customer__consultant=request.user)
+        else:
+            query_set = Enrollment.objects.filter(customer_id=customer_id)
+        return render(request, 'enrollment_list.html', {'enrollment_list': query_set})
+
+
+# 添加/编辑报名记录
+def enrollment(request, customer_id=None, enrollment_id=None):
+    # 先根据报名表id去查询
+    enrollment_obj = Enrollment.objects.filter(id=enrollment_id).first()
+    # 查询不到报名表说明是新增报名表操作
+    # 又因为新增报名表必须指定客户
+    if not enrollment_obj:
+        enrollment_obj = Enrollment(customer=Customer.objects.filter(id=customer_id).first())
+    form_obj = EnrollmentForm(instance=enrollment_obj)
+    if request.method == 'POST':
+        form_obj = EnrollmentForm(request.POST, instance=enrollment_obj)
+        if form_obj.is_valid():
+            new_obj = form_obj.save()
+            # 报名成功，更改客户当前的状态
+            new_obj.customer.status = 'signed'
+            new_obj.customer.save()  # 改的是哪张表的字段就保存哪个对象
+            return redirect(reverse('enrollment_list', kwargs={'customer_id': 0}))
+        else:
+            return HttpResponse('出错啦')
+    return render(request, 'enrollment.html', {'form_obj': form_obj})

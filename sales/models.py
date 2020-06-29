@@ -3,6 +3,7 @@ from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseU
 from django.utils.translation import ugettext_lazy as _
 from multiselectfield import MultiSelectField
 from django.core.validators import RegexValidator
+from django.utils.safestring import mark_safe
 
 # 课程表
 course_choices = (('Linux', 'Linux中高级'),
@@ -94,6 +95,18 @@ class Customer(models.Model):
     def show_class_list(self):
         return '|'.join([str(i) for i in self.class_list.all()])
 
+    # 展示状态
+    def show_status(self):
+        _status_color = {
+            'signed': 'blue',
+            'unregistered': 'red',
+            'studying': 'orange',
+            'paid_in_full': 'green',
+        }
+        return mark_safe('<span style="background-color: {};color: white">{}</span>'.format(
+            _status_color[self.status],
+            self.get_status_display()
+        ))
 class Campuses(models.Model):
     """
     校区表

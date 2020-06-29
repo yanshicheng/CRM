@@ -1,0 +1,57 @@
+{% extends 'base.html' %}
+
+{% block page-main %}
+    <div>
+        <h2 class="text-center">{% if edit_id %}编辑报名表{% else %}添加报名表{% endif %}</h2>
+        <form class="form-horizontal" action="" method="post" novalidate>
+            {% csrf_token %}
+            {% for field in form_obj %}
+                <div class="form-group {% if  field.errors.0 %}has-error{% endif %}">
+                    <label for="{{ field.id_for_label }}" class="col-sm-2 control-label">{{ field.label }}</label>
+                    <div class="col-sm-10">
+                        {{ field }}
+                        <span class="help-block">{{ field.errors.0 }}</span>
+                    </div>
+                </div>
+            {% endfor %}
+            <div class="form-group">
+                <div class="col-sm-offset-2 col-sm-10">
+                    <button type="submit" class="btn btn-default">提交</button>
+                </div>
+            </div>
+        </form>
+    </div>
+{% endblock %}
+
+{% block page-js %}
+    {% load static %}
+    <script src="{% static 'jquery.js' %}"></script>
+    <script>
+    $(document).ready(function () {
+        $('#id_school').on('change', function () {
+            var sId = $(this).val();
+            // 获取到选中的校区id
+            // 发AJAX到后端取出当前校区下面所有的课程
+            $.ajax({
+                url: '/crm/ajax_class/',
+                type: 'get',
+                data: {'sid': sId},
+                success: function (res) {
+                    console.log(res);
+                    var $classSelect = $('#id_enrolment_class');
+                    $classSelect.text('');
+                    $classSelect.append('<option value="">-------</option>');
+                    $.each(res.data, function (k, v) {
+                        console.log(k, v);
+                        var opEle = document.createElement('option');
+                        $(opEle).text(v.name).attr('value', v.id);
+                        $classSelect.append(opEle);
+                    })
+                }
+            })
+        })
+    })
+    </script>
+{% endblock %}
+
+
